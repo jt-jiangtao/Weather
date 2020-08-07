@@ -114,8 +114,8 @@ def getCityOrAreaWeather(*args):
                     dict['air_quality'] = dict['air_quality'] + "μg/m3"
             day_weather['weather&otherData'][day]['more_hour_weather'] = more_weather_list
         list_index += 1
-    print(str(day_weather).replace("\'","\""))
-    print(province)
+    # print(str(day_weather).replace("\'","\""))
+    # print(province)
     if area == "":
         print("->  " + province + " - " + city)
     else:
