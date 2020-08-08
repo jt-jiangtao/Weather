@@ -10,6 +10,7 @@ from pymongo import MongoClient
 
 client = MongoClient(host="localhost", port=27017)
 client.admin.authenticate("admin", "admin")
+# client.Weather.Town.drop()
 
 headers = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
@@ -23,8 +24,7 @@ headers = {
 }
 
 def getCityOrAreaWeather(*args):
-    old_url, new_url, province, city = args[0]
-    area = ""
+    old_url, new_url, province, city, area = args[0]
     # print(old_url, new_url)
     day_weather = {"province": province, "city":city, "area": area, "old_url":old_url, "new_url": new_url,"inputTime": datetime.now().strftime('%Y-%m-%d %H:%M'),
                    "updateTime": "", "source": "中央气象台", "weather&otherData": {
@@ -140,20 +140,56 @@ def getCityOrAreaWeather(*args):
         print("->  " + province + " - " + city)
     else:
         print("->  " + province + " - " + city + " - " + area)
-    client.Weather.City.insert_one(day_weather)
+    if area == "This is city,no area":
+        client.Weather.City.insert_one(day_weather)
+    else:
+        client.Weather.Area.insert_one(day_weather)
     print("ok")
-def pool():
+def poolForCity():
     city_list = []
     with open("../CityWeatherID_v2/data.json") as f:
         data = json.load(f)
     for province in data:
         for city in province['cityList']:
-            city_list.append((city['old_url'],city['new_url'],province['province'],city['city']))
+            city_list.append((city['old_url'],city['new_url'],province['province'],city['city'],"This is city,no area"))
     with ThreadPoolExecutor(max_workers=20) as pool:
         pool.map(getCityOrAreaWeather,city_list)
 
+def poolForArea():
+    area_list = []
+    with open("../CityWeatherID_v2/data.json") as f:
+        data = json.load(f)
+    for province in data:
+        for city in province['cityList']:
+            for area in city['areaList']:
+                area_list.append((area['old_url'],area['new_url'],province['province'],city['city'],area['area']))
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        pool.map(getCityOrAreaWeather,area_list)
+
 if __name__ == '__main__':
-    print("begin ...")
-    pool()
-    print("end ...")
+    # print("begin ...")
+    # client.Weather.City.drop()
+    # poolForCity()
+    # print("end ...")
     # getCityOrAreaWeather(("http://www.weather.com.cn/weather/101050801.shtml","http://www.weather.com.cn/weathern/101050801.shtml","伊春",""))
+    print("begin ...")
+    client.Weather.Area.drop()
+    poolForArea()
+    print("end ...")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
