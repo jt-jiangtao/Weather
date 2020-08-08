@@ -6,6 +6,10 @@ import requests
 from datetime import datetime,date,time,timedelta
 from lxml import etree
 from concurrent.futures.thread import ThreadPoolExecutor
+from pymongo import MongoClient
+
+client = MongoClient(host="localhost", port=27017)
+client.admin.authenticate("admin", "admin")
 
 headers = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
@@ -42,6 +46,7 @@ def getCityOrAreaWeather(*args):
     more_weather_list = json.loads(more_weather.replace("od21","time").replace("od22","temperature").replace("od23","polar_coordinates_of_the_wind").replace("od24","wind_direction").replace("od25","wind_grade").replace("od26","rainfall").replace("od27","relative_humidity").replace("od28","air_quality").replace("\'","\""))
     # print(more_weather_list)
 
+    old_html = etree.HTML(response_old.text)
     relative_date_list = html.xpath('//p[@class="date-info"]/text()')
     day_weather_list = html.xpath('//p[@class="weather-info info-style"]/text()') + html.xpath('//p[@class="weather-info"]/text()')
     temperature_blue_sun_list = html.xpath('//div[@class="blueFor-container"]/script/text()')
@@ -51,6 +56,7 @@ def getCityOrAreaWeather(*args):
     blue_sun = blue_sun_re.findall(temperature_blue_sun_list[0])
     wind_html = html.xpath('//div[@class="wind-container"]')
     life_assistant_html = html.xpath('//div[@class="weather_shzs"]')
+    life_index_html = old_html.xpath('//ul[@class="clearfix"]')
     # print(life_assistant_html[0].xpath('./ul/li/h2/text()'))
     # print(life_assistant_html[0].xpath('./div[1]/dl/dt/em/text()'))
     # print(life_assistant_html[0].xpath('./div[1]/dl/dd/text()'))
@@ -85,8 +91,21 @@ def getCityOrAreaWeather(*args):
         else:
             list = []
             for i in range(0,6):
-                list.append({"assistant_type": life_assistant_html[0].xpath('./ul/li/h2/text()')[i].replace("·",""),"assistant_grade": life_assistant_html[0].xpath('./div['+str(list_index)+']/dl/dt/em/text()')[i],"assistant_description": life_assistant_html[0].xpath('./div['+str(list_index)+']/dl/dd/text()')[i].replace("。","")})
+                list.append({"assistant_type": life_assistant_html[0].xpath('./ul/li/h2/text()')[i].replace("·",""),"assistant_grade": life_assistant_html[0].xpath('./div['+str(list_index)+']/dl/dt/em/text()')[i],"assistant_description": life_assistant_html[0].xpath('./div['+str(list_index)+']/dl/dd/text()')[i]})
             day_weather['weather&otherData'][day]['life_assistant'] = list
+        # 生活指数 life index
+        list = []
+        # print(life_index_html[0])
+        if list_index != 0:
+            for i in range(1, 7):
+                # print(life_index_html[list_index].xpath('./li[6]//p/text()'))
+                # print(old_url,life_index_html[list_index].xpath('./li[2]//span/em[@class="star"]'))
+                if i != 2:
+                    list.append({"life_index_type": life_index_html[list_index-1].xpath('./li['+str(i)+']//em/text()')[0].replace("健臻·",""),"life_index_grade": life_index_html[list_index-1].xpath('./li['+str(i)+']//span/text()')[0],"life_index_description": life_index_html[list_index-1].xpath('./li['+str(i)+']//p/text()')[0]})
+                else:
+                    list.append({"life_index_type": life_index_html[list_index-1].xpath('./li[2]//em/text()')[0].replace("健臻·",""),"star": len(life_index_html[list_index-1].xpath('./li[2]//span/em[@class="star"]')),"life_index_description": life_index_html[list_index-1].xpath('./li[2]//p/text()')[0]})
+        # print(list)
+        day_weather['weather&otherData'][day]['life_index'] = list
 
         # hour weather
         day_weather['weather&otherData'][day]['hour_weather'] = []
@@ -115,11 +134,14 @@ def getCityOrAreaWeather(*args):
             day_weather['weather&otherData'][day]['more_hour_weather'] = more_weather_list
         list_index += 1
     # print(str(day_weather).replace("\'","\""))
+    # print(str(day_weather).replace("\'","\""))
     # print(province)
     if area == "":
         print("->  " + province + " - " + city)
     else:
         print("->  " + province + " - " + city + " - " + area)
+    client.Weather.City.insert_one(day_weather)
+    print("ok")
 def pool():
     city_list = []
     with open("../CityWeatherID_v2/data.json") as f:
@@ -127,10 +149,11 @@ def pool():
     for province in data:
         for city in province['cityList']:
             city_list.append((city['old_url'],city['new_url'],province['province'],city['city']))
-    with ThreadPoolExecutor(max_workers=10) as pool:
+    with ThreadPoolExecutor(max_workers=20) as pool:
         pool.map(getCityOrAreaWeather,city_list)
 
 if __name__ == '__main__':
     print("begin ...")
     pool()
     print("end ...")
+    # getCityOrAreaWeather(("http://www.weather.com.cn/weather/101050801.shtml","http://www.weather.com.cn/weathern/101050801.shtml","伊春",""))
