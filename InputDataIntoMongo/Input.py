@@ -176,20 +176,3 @@ if __name__ == '__main__':
     client.Weather.Area.drop()
     poolForArea()
     print("end ...")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
